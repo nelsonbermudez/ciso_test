@@ -1,0 +1,253 @@
+{
+  "uid": "soc-overview",
+  "title": "AI-SOC Overview",
+  "tags": ["soc", "ai", "dlp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Agente (fuente)",
+        "type": "query",
+        "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+        "definition": "{\"find\":\"terms\",\"field\":\"source.keyword\"}",
+        "query": "{\"find\":\"terms\",\"field\":\"source.keyword\"}",
+        "includeAll": true,
+        "allValue": "*",
+        "multi": false,
+        "refresh": 1,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "agent",
+        "label": "Sesión / agente",
+        "type": "query",
+        "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+        "definition": "{\"find\":\"terms\",\"field\":\"session_id.keyword\"}",
+        "query": "{\"find\":\"terms\",\"field\":\"session_id.keyword\"}",
+        "includeAll": true,
+        "allValue": "*",
+        "multi": false,
+        "refresh": 1,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Eventos por minuto",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "timestamp", "settings": { "interval": "auto" } }],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "drawStyle": "bars" } } }
+    },
+    {
+      "id": 2,
+      "title": "Actividad por agente",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "source.keyword", "settings": { "size": "10", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Requests por modelo",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "type:response AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "model.keyword", "settings": { "size": "10", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Sesiones activas",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "session_id.keyword", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Tokens por modelo",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "type:response AND usage.total_tokens:* AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "sum", "field": "usage.total_tokens" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "model.keyword", "settings": { "size": "10", "order": "desc", "orderBy": "1" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Latencia media por modelo",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "type:response AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "avg", "field": "latency_ms" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "model.keyword", "settings": { "size": "10", "order": "desc", "orderBy": "1" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Bloqueos por regla",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "type:block AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "finding_rules.keyword", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Bloqueos en el tiempo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "type:block AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "timestamp", "settings": { "interval": "auto" } }],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "drawStyle": "bars" } } }
+    },
+    {
+      "id": 9,
+      "title": "PII en el tiempo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "finding_categories:pii AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "timestamp", "settings": { "interval": "auto" } }],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "drawStyle": "bars" } } }
+    },
+    {
+      "id": 10,
+      "title": "PII por tipo",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "finding_categories:pii AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "finding_rules.keyword", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Exfiltración por regla",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "exfil:true AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "terms", "field": "finding_rules.keyword", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } }],
+          "timeField": "timestamp"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Exfiltración en el tiempo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "soc-opensearch" },
+          "query": "exfil:true AND source:\"$source\" AND session_id:\"$agent\"",
+          "metrics": [{ "id": "1", "type": "count" }],
+          "bucketAggs": [{ "id": "2", "type": "date_histogram", "field": "timestamp", "settings": { "interval": "auto" } }],
+          "timeField": "timestamp"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "drawStyle": "bars" } } }
+    }
+  ]
+}

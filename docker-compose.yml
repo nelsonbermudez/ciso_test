@@ -1,0 +1,151 @@
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.18
+    container_name: soc-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --overprovisioned
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+      - "9644:9644"
+
+  redpanda-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.18
+    container_name: soc-redpanda-init
+    depends_on:
+      - redpanda
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "esperando redpanda..."
+        until rpk topic list --brokers=redpanda:9092 >/dev/null 2>&1; do sleep 2; done
+        echo "creando topic soc.events"
+        rpk topic create soc.events -p 1 --brokers=redpanda:9092 || true
+
+  opensearch-node:
+    image: opensearchproject/opensearch:2.19.1
+    container_name: soc-opensearch
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.19.1
+    container_name: soc-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch-node:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      - opensearch-node
+
+  dashboards-init:
+    image: curlimages/curl:latest
+    container_name: soc-dashboards-init
+    depends_on:
+      - opensearch-dashboards
+    restart: "no"
+    entrypoint: ["/bin/sh", "/init-dashboards.sh"]
+    environment:
+      - DASHBOARDS_HOST=http://opensearch-dashboards:5601
+    volumes:
+      - ./scripts/init-dashboards.sh:/init-dashboards.sh:ro
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway.Dockerfile
+    container_name: soc-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - GATEWAY_ADDR=:8080
+      - REDPANDA_BROKERS=redpanda:9092
+      - REDPANDA_TOPIC=soc.events
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-https://api.anthropic.com/v1}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - SOC_MOCK=${SOC_MOCK:-0}
+    depends_on:
+      - redpanda
+
+  ingest:
+    build:
+      context: .
+      dockerfile: docker/ingest.Dockerfile
+    container_name: soc-ingest
+    environment:
+      - REDPANDA_BROKERS=redpanda:9092
+      - REDPANDA_TOPIC=soc.events
+      - CONSUMER_GROUP=aisoc-ingest
+      - OPENSEARCH_URLS=http://opensearch-node:9200
+      - OPENSEARCH_INDEX=soc-events
+    depends_on:
+      - redpanda
+      - opensearch-node
+
+  transect:
+    build:
+      context: .
+      dockerfile: docker/transect.Dockerfile
+    container_name: soc-transect
+    user: "1000:1000"
+    environment:
+      - OPENSEARCH_URLS=http://opensearch-node:9200
+      - OPENSEARCH_INDEX=soc-events
+      - EXPORT_INTERVAL_SECONDS=3600
+      - EXPORT_DIR=/out
+    volumes:
+      - ./output_files:/out
+    depends_on:
+      - opensearch-node
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: soc-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-opensearch-datasource
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - opensearch-node
+
+  transect-viewer:
+    image: nginx:alpine
+    container_name: soc-transect-viewer
+    ports:
+      - "8090:80"
+    volumes:
+      - ./reports:/usr/share/nginx/html:ro
+      - ./docker/viewer.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  grafana-data:

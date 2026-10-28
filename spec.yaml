@@ -1,0 +1,29 @@
+# Vocabulario de fases y sub-agentes para el análisis de Transect.
+# Define la trayectoria esperada de un agente de desarrollo (Hermes / Claude Code).
+
+phases:
+  - label: explore
+    description: "Inspeccionar el código, leer archivos, buscar símbolos y entender la estructura y dependencias del proyecto."
+  - label: plan
+    description: "Diseñar el plan de implementación: tareas, archivos a tocar, orden de trabajo y riesgos."
+  - label: implement
+    description: "Escribir o modificar código y aplicar los cambios planeados."
+  - label: test
+    description: "Ejecutar pruebas, compilar, ejecutar comandos de verificación y revisar resultados."
+  - label: verify
+    description: "Revisar el resultado final, corregir detalles y validar contra los requisitos."
+  - label: ops
+    description: "Coordinación, setup, git, y tareas operativas que no son trabajo de producto."
+    ops: true
+
+subagent_labels:
+  - label: researcher
+    description: "Investiga y recopila información del código o de fuentes externas."
+  - label: coder
+    description: "Implementa cambios de código."
+  - label: reviewer
+    description: "Revisa y valida cambios propuestos."
+  - label: tester
+    description: "Ejecuta pruebas y reporta resultados."
+
+context: "Tarea de desarrollo de software asistida por un agente: analizar un repositorio, planificar un cambio, implementarlo, probarlo y verificarlo."
